@@ -36,9 +36,9 @@ describe("gitOp", () => {
 
 describe("resolvePolicy", () => {
   const config: Config = {
-    default: { allow: ["commit", "push"], deny: ["reset"] },
+    default: { allow: ["commit", "push"], ask: ["tag"], deny: ["reset"] },
     branches: {
-      main: { allow: [] },
+      main: { allow: [], ask: ["commit"] },
     },
     repos: {
       "/repo": { allow: ["commit"], deny: ["push"] },
@@ -48,13 +48,15 @@ describe("resolvePolicy", () => {
   test("falls back to default when no rule matches", () => {
     expect(resolvePolicy(config, "feature", "/other")).toEqual({
       allow: ["commit", "push"],
+      ask: ["tag"],
       deny: ["reset"],
     })
   })
 
-  test("branch rule replaces allow and unions deny with default", () => {
+  test("branch rule replaces allow and ask, and unions deny with default", () => {
     expect(resolvePolicy(config, "main", "/other")).toEqual({
       allow: [],
+      ask: ["commit"],
       deny: ["reset"],
     })
   })
@@ -62,29 +64,47 @@ describe("resolvePolicy", () => {
   test("repo rule overrides the branch rule", () => {
     expect(resolvePolicy(config, "main", "/repo")).toEqual({
       allow: ["commit"],
+      ask: ["tag"],
       deny: ["reset", "push"],
     })
   })
 
+  test("ask falls back to the baseline when the rule omits it", () => {
+    // The repo rule omits `ask`, so the baseline `ask` applies.
+    expect(resolvePolicy(config, "main", "/repo").ask).toEqual(["tag"])
+    // A rule that sets `ask` replaces the baseline.
+    expect(resolvePolicy(config, "main", "/other").ask).toEqual(["commit"])
+  })
+
   test("fail-closed when no config is present", () => {
-    expect(resolvePolicy({}, "main", "/repo")).toEqual({ allow: [], deny: [] })
+    expect(resolvePolicy({}, "main", "/repo")).toEqual({ allow: [], ask: [], deny: [] })
   })
 })
 
 describe("decide", () => {
-  test("allows an operation in allow and not in deny", () => {
-    expect(decide("commit", { allow: ["commit"], deny: [] }).allowed).toBe(true)
+  test("allows an operation in allow and not in deny or ask", () => {
+    expect(decide("commit", { allow: ["commit"], ask: [], deny: [] }).effect).toBe("allow")
   })
 
-  test("deny wins over allow", () => {
-    const decision = decide("push", { allow: ["push"], deny: ["push"] })
-    expect(decision.allowed).toBe(false)
+  test("asks for an operation in ask", () => {
+    const decision = decide("commit", { allow: [], ask: ["commit"], deny: [] })
+    expect(decision.effect).toBe("ask")
+    expect(decision.message).toContain("commit")
+  })
+
+  test("deny wins over ask and allow", () => {
+    const decision = decide("push", { allow: ["push"], ask: ["push"], deny: ["push"] })
+    expect(decision.effect).toBe("deny")
     expect(decision.message).toContain("denied")
   })
 
-  test("denies an operation missing from allow", () => {
-    const decision = decide("commit", { allow: [], deny: [] })
-    expect(decision.allowed).toBe(false)
+  test("ask wins over allow", () => {
+    expect(decide("commit", { allow: ["commit"], ask: ["commit"], deny: [] }).effect).toBe("ask")
+  })
+
+  test("denies an operation missing from every list", () => {
+    const decision = decide("commit", { allow: [], ask: [], deny: [] })
+    expect(decision.effect).toBe("deny")
     expect(decision.message).toContain("not allowed")
   })
 })

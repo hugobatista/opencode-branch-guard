@@ -36,6 +36,7 @@ const FLAG_WITH_VALUE = new Set([
 
 export type BranchPolicy = {
   allow?: string[]
+  ask?: string[]
   deny?: string[]
 }
 
@@ -47,11 +48,14 @@ export type Config = {
 
 export type ResolvedPolicy = {
   allow: string[]
+  ask: string[]
   deny: string[]
 }
 
+export type Effect = "allow" | "ask" | "deny"
+
 export type Decision = {
-  allowed: boolean
+  effect: Effect
   message?: string
 }
 
@@ -85,9 +89,9 @@ export function gitOp(cmd: string): GitOp | null {
 }
 
 // Resolve the effective policy for a command. `repos[directory]` overrides
-// `branches[branch]`, which overrides `default`. A rule's `allow` replaces the
-// baseline; its `deny` unions with the baseline. No resolved `allow` means no
-// mutation is permitted (fail-closed).
+// `branches[branch]`, which overrides `default`. A rule's `allow` and `ask`
+// replace the baseline; its `deny` unions with the baseline. No resolved
+// `allow` means no mutation is permitted (fail-closed).
 export function resolvePolicy(
   config: Config,
   branch: string | undefined,
@@ -98,16 +102,22 @@ export function resolvePolicy(
   const repoRule = directory !== undefined ? config.repos?.[directory] : undefined
   const rule = repoRule ?? branchRule
   const allow = rule?.allow ?? base.allow ?? []
+  const ask = rule?.ask ?? base.ask ?? []
   const deny = [...(base.deny ?? []), ...(rule?.deny ?? [])]
-  return { allow, deny }
+  return { allow, ask, deny }
 }
 
+// Resolve the effect for one git operation. Precedence is `deny > ask > allow`.
+// An operation missing from every list is denied (fail-closed).
 export function decide(op: string, policy: ResolvedPolicy): Decision {
   if (policy.deny.includes(op)) {
-    return { allowed: false, message: `Blocked: git ${op} is denied by config` }
+    return { effect: "deny", message: `Blocked: git ${op} is denied by config` }
   }
-  if (!policy.allow.includes(op)) {
-    return { allowed: false, message: `Blocked: git ${op} is not allowed by config` }
+  if (policy.ask.includes(op)) {
+    return { effect: "ask", message: `git ${op} requires approval by config` }
   }
-  return { allowed: true }
+  if (policy.allow.includes(op)) {
+    return { effect: "allow" }
+  }
+  return { effect: "deny", message: `Blocked: git ${op} is not allowed by config` }
 }

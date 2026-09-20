@@ -1,7 +1,7 @@
 import { execFile } from "node:child_process"
 import { promisify } from "node:util"
 import { Plugin } from "@opencode/plugin"
-import { decide, gitOp, resolvePolicy, type Config } from "./core"
+import { decide, gitOp, resolvePolicy, type Config, type Effect } from "./core"
 
 const execFileAsync = promisify(execFile)
 
@@ -57,15 +57,29 @@ export default Plugin.define({
         : undefined
       const policy = resolvePolicy(config, branch, directory)
 
+      // Aggregate every resource of a compound command. Precedence is
+      // `deny > ask > allow`: a single denied operation blocks the command,
+      // otherwise a single ask escalates it. Never downgrade an effect the
+      // core already resolved (for example an `ask` from the user's config).
+      let effect: Effect = "allow"
+      let message: string | undefined
       for (const resource of event.resources) {
         const op = gitOp(resource)
         if (op === null) continue
         const decision = decide(op, policy)
-        if (!decision.allowed) {
-          event.effect = "deny"
-          event.message = decision.message
-          return
+        if (decision.effect === "deny") {
+          effect = "deny"
+          message = decision.message
+          break
         }
+        if (decision.effect === "ask") {
+          effect = "ask"
+          message ??= decision.message
+        }
+      }
+      if (effect !== "allow") {
+        event.effect = effect
+        event.message = message
       }
     })
   },

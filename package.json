@@ -1,7 +1,7 @@
 {
   "name": "opencode-branch-guard",
-  "version": "0.1.0",
-  "description": "OpenCode plugin: blocks git mutations (commit, push, merge, rebase, ...) based on the current branch or repository, so protected branches stay clean.",
+  "version": "0.2.0",
+  "description": "OpenCode plugin: allows, asks, or blocks git mutations (commit, push, merge, rebase, ...) based on the current branch or repository, so protected branches stay clean.",
   "type": "module",
   "license": "MIT",
   "author": {
