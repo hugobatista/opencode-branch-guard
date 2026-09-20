@@ -15,6 +15,49 @@ commands untouched.
 > implementations do not run in V2. This plugin is built against
 > `@opencode/plugin` V2 only.
 
+## Motivation
+
+OpenCode V2 already ships permissions with `allow`, `ask`, and `deny`. You can
+write `{ "action": "shell", "resource": "git push *", "effect": "deny" }`. Those
+rules are static: they match the command text. They cannot see the current
+branch or the repository.
+
+The problem: `git commit` has the same text on `main` and on `feat/x`. A static
+rule cannot allow it on `feat/x` and ask on `main`. To protect `main`, you must
+ask or deny `git commit` everywhere, including feature branches.
+
+This plugin adds the missing input: the VCS state at command time. It resolves
+the branch and the checkout directory, then decides per git operation.
+
+### Differences from the built-in `ask`
+
+| Aspect | Built-in permissions (V2) | branch-guard |
+|---|---|---|
+| Decision input | Command text pattern | Branch + directory + git operation |
+| When decided | Config load (static) | Command time (dynamic) |
+| Git awareness | None; raw shell patterns | Recognizes git mutations |
+| Branch scope | None | Per exact branch name |
+| Repository scope | None | Per checkout directory |
+| Default | Permissive (`allow`); `ask` only where configured | Deny (fail-closed); unlisted mutation is blocked |
+| Read-only commands | Need an explicit `allow` pattern | Pass automatically |
+| Compound commands | Scanner splits into command resources | Parses the git op; aggregates `deny > ask > allow` |
+| Persistence | "Allow always" saves project `allow` rules | Config only |
+
+### When to use which
+
+They compose. The built-in rules run first, and the plugin hooks into the
+resolution:
+
+- **Use built-in `deny` for absolute blocks.** A configured `deny` is final and
+  the plugin never sees it. Example: block `git push` in every repository.
+- **Use built-in `allow`/`ask` for tool-level rules** that do not depend on the
+  branch, such as allowing `git status`.
+- **Use the plugin for branch- and repository-aware policy** — the case the
+  built-in rules cannot express.
+
+The plugin escalates but never downgrades. If the core resolved `ask`, the
+plugin keeps `ask`. See [About `ask`](#about-ask) for the interaction details.
+
 ## What it does
 
 - Intercepts the `shell` permission via `ctx.permission.hook("evaluate")` and
