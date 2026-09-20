@@ -18,8 +18,9 @@ read-only commands untouched.
 
 - Intercepts the `shell` permission via `ctx.permission.hook("evaluate")` and
   returns `effect: "deny"` when a git mutation violates the resolved policy.
-- Resolves the branch from `ctx.vcs.get().data.branch.current` — no subprocess,
-  no `git` spawn.
+- Resolves the branch with `git -C <directory> branch --show-current`; the
+  directory comes from the session (`ctx.session.get().location.directory`), not
+  the plugin instance.
 - Resolves the policy hierarchically: `repos[<directory>]` overrides
   `branches[<branch>]`, which overrides `default`.
 - Applies the same decision to every resource of a compound command, so
@@ -66,13 +67,14 @@ Pass [options](#configuration) to allow the operations you want.
    bun install
    ```
 
-2. Register the plugin in your `opencode.jsonc` with an absolute path to
-   `src/index.ts`:
+2. Register the plugin in your `opencode.jsonc` with an absolute path to the
+   `src` directory (a local plugin directory must contain `index.ts` at its
+   root):
 
    ```jsonc
    {
      "$schema": "https://opencode.ai/config.json",
-     "plugins": ["/home/your-user/code/projects/opencode-branch-guard/src/index.ts"]
+     "plugins": ["/home/your-user/code/projects/opencode-branch-guard/src"]
    }
    ```
 
@@ -126,8 +128,8 @@ Recognized git operations: `add`, `branch`, `checkout`, `cherry-pick`, `clean`,
   baseline). A `repos.<directory>` entry overrides both.
 - **`deny` wins.** An operation is allowed only if it is in the resolved `allow`
   and not in the resolved `deny`.
-- **Exact branch match.** The branch is resolved at call time via
-  `ctx.vcs.get()`. No globs.
+- **Exact branch match.** The branch is resolved at call time with
+  `git branch --show-current`. No globs.
 - **Read-only commands pass.** `status`, `log`, `diff`, `fetch` and anything not
   in the mutation list are never blocked.
 
@@ -180,6 +182,10 @@ The plugin inspects the shell command string, so it can be bypassed by:
   subprocess started by a program the agent runs).
 - Compound commands the scanner cannot split.
 
+Also note that `branch` is treated as a mutation, so `git branch` and
+`git branch --show-current` are blocked on a protected branch. Use
+`git rev-parse --abbrev-ref HEAD` if you need a read-only branch check there.
+
 It is a guardrail against accidental mutations, not a security boundary.
 
 ## Verify
@@ -214,7 +220,8 @@ bun run build       # dist/index.js + dist/index.d.ts (npm entrypoint)
   OpenCode imports. Fully unit-tested.
 - `src/index.ts` — the plugin (`id: "branch-guard"`), a
   `Plugin.define({ id, setup })` from `@opencode/plugin`. It registers a
-  `ctx.permission.hook("evaluate")` and reads the branch from `ctx.vcs.get()`.
+  `ctx.permission.hook("evaluate")`, resolves the session directory, and reads
+  the branch with `git branch --show-current`.
 - `scripts/build.ts` — bundles `src/index.ts` to `dist/index.js` with
   `@opencode/plugin` external, then emits declarations with `tsc`.
 
