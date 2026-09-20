@@ -58,6 +58,23 @@ resolution:
 The plugin escalates but never downgrades. If the core resolved `ask`, the
 plugin keeps `ask`. See [About `ask`](#about-ask) for the interaction details.
 
+## Demo
+
+The screenshots come from a demo repository. The config allows `commit` on a
+feature branch, asks for `commit` on `main`, and denies `push` on `main`.
+
+**Allowed on a feature branch.** The agent runs `git commit` with no prompt.
+
+![OpenCode runs git commit on a feature branch without a prompt](https://raw.githubusercontent.com/hugobatista/opencode-branch-guard/main/docs/allow-feature.png)
+
+**Asked on `main`.** The same command opens the permission prompt.
+
+![OpenCode asks for approval before running git commit on main](https://raw.githubusercontent.com/hugobatista/opencode-branch-guard/main/docs/ask-on-main.png)
+
+**Denied on `main`.** `git push` is blocked and the message explains why.
+
+![OpenCode blocks git push on main with a config message](https://raw.githubusercontent.com/hugobatista/opencode-branch-guard/main/docs/deny-on-main.png)
+
 ## What it does
 
 - Intercepts the `shell` permission via `ctx.permission.hook("evaluate")` and
