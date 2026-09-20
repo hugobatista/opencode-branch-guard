@@ -1,0 +1,60 @@
+{
+  "name": "opencode-branch-guard",
+  "version": "0.1.0",
+  "description": "OpenCode plugin: blocks git mutations (commit, push, merge, rebase, ...) based on the current branch or repository, so protected branches stay clean.",
+  "type": "module",
+  "license": "MIT",
+  "author": {
+    "name": "Hugo Batista",
+    "url": "https://github.com/hugobatista"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hugobatista/opencode-branch-guard.git"
+  },
+  "homepage": "https://github.com/hugobatista/opencode-branch-guard#readme",
+  "bugs": {
+    "url": "https://github.com/hugobatista/opencode-branch-guard/issues"
+  },
+  "keywords": [
+    "opencode",
+    "opencode-plugin",
+    "git",
+    "branch",
+    "guard",
+    "permissions"
+  ],
+  "engines": {
+    "opencode": ">=2.0.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "test": "bun test",
+    "typecheck": "tsc --noEmit",
+    "build": "bun run scripts/build.ts",
+    "prepublishOnly": "bun run typecheck && bun test && bun run build"
+  },
+  "peerDependencies": {
+    "@opencode/plugin": ">=2.0.10"
+  },
+  "devDependencies": {
+    "@opencode/plugin": "2.0.10",
+    "@types/bun": "^1.4.1",
+    "@types/node": "^24.0.0",
+    "typescript": "^5.8.0"
+  }
+}
